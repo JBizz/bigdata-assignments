@@ -1,0 +1,13 @@
+# Big Data Assignment 1 - Jon Bleichner
+## Part 1
+> 1) ''but appeared once (''but    1).
+>
+> 2) zorah appeared 8 times (zorah    8).
+>
+> 3) Based on the following line from the output: Combine output records=41788 I assume that there are 41788 unique records.
+## Part 2
+> 4) aaron appears 416 times (aaron    416).
+>
+> 5) This appears to be the same as question 2, zorah is the third to last record and it appears 8 times (zorah    8).
+>
+> 6) Again, assuming the counter for the combine output is what I should be using, there were 31940 unique records (Combine output records=31940).
