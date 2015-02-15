@@ -50,23 +50,20 @@ public class PairsPMI extends Configured implements Tool {
     public void map(LongWritable key, Text value, Context context)
         throws IOException, InterruptedException {
       String line = ((Text) value).toString();
-      Text prev = new Text();
+      Text prev = null;
       Text cur;
       Text marge = new Text("*");
       StringTokenizer itr = new StringTokenizer(line);
 
       while (itr.hasMoreTokens()) {
-        if(prev == null){
-          prev = new Text(itr.nextToken());
-          cur = new Text(itr.nextToken());
+        cur = new Text(itr.nextToken());
+        if(prev != null){
+          PAIRS.set(cur, prev);
+          MARGE.set(cur, marge);
+          context.write(PAIRS,ONE);
+          context.write(MARGE,ONE);
         }
-        else{
-          cur = new Text(itr.nextToken());
-        }
-        PAIRS.set(cur, prev);
-        MARGE.set(cur, marge);
-        context.write(PAIRS,ONE);
-        context.write(MARGE,ONE);
+        prev = cur;
       }
     }
   }
