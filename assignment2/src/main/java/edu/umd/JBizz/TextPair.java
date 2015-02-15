@@ -60,16 +60,21 @@ public class TextPair implements WritableComparable<TextPair> {
 	}
 
 	@Override
-	public String toString(){
-		return first + "\t" + second;
-	}
-
-	@Override
-	public int compareTo(TextPair tp){
-		int cmp = first.compareTo(tp.first);
-		if(cmp != 0) {
-			return cmp;
-		}
-		return second.compareTo(tp.second);
-	}
+    public int compareTo(TextPair tp){
+        if(second.equals("*") && tp.getSecond().equals("*")){
+            return 0;
+          }
+          else{
+            if (second.equals("*")){
+              return -1;
+            }
+            if (tp.getSecond().equals("*")){
+              return 1;
+            }
+          }
+        if(first.equals(tp.getFirst())){
+            return second.compareTo(tp.getSecond());
+        }
+        return first.compareTo(tp.getFirst());
+    }
 }
