@@ -81,7 +81,7 @@ public class TextPair implements WritableComparable<TextPair> {
 		return first + "\t" + second;
 	}
 
-	@Override
+	/*@Override
 	public int compareTo(TextPair tp){
 		if(second.equals("*") && tp.getSecond.equals("*")){
 	        return 0;
@@ -98,5 +98,5 @@ public class TextPair implements WritableComparable<TextPair> {
 			return second.equals(tp.getSecond());
 		}
 		return first.equals(tp.getFirst());
-	}
+	}*/
 }

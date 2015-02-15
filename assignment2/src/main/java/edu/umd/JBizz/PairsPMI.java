@@ -147,7 +147,7 @@ public class PairsPMI extends Configured implements Tool {
     }
   }*/
 
-  public class GroupComparator extends WritableComparator {
+  public static class GroupComparator extends WritableComparator {
     protected GroupComparator() {
       super(TextPair.class, true);
     }
@@ -158,11 +158,10 @@ public class PairsPMI extends Configured implements Tool {
 
 
       return tp1.getFirst().compareTo(tp2.getFirst());
-      return tp1.getFirst().compareTo(tp2.getSecond());
     }
   }
 
-  protected class MyPartitioner extends Partitioner<TextPair, IntWritable>{
+  public static class MyPartitioner extends Partitioner<TextPair, IntWritable>{
     @Override
     public int getPartition(TextPair key, IntWritable value, int numReduceTasks){
       return (key.hashCode() & Integer.MAX_VALUE) % numReduceTasks;
@@ -229,14 +228,14 @@ public class PairsPMI extends Configured implements Tool {
     FileInputFormat.setInputPaths(job, new Path(inputPath));
     FileOutputFormat.setOutputPath(job, new Path(outputPath));
  
-    job.setOutputKeyClass(Text.class);
+    job.setOutputKeyClass(TextPair.class);
     job.setOutputValueClass(IntWritable.class);
 
     job.setMapperClass(MyMapper.class);
     job.setPartitionerClass(MyPartitioner .class);
-    job.setSortComparatorClass(KeyComparator.class);
+    //job.setSortComparatorClass(KeyComparator.class);
     job.setGroupingComparatorClass(GroupComparator.class);
-    job.setCombinerClass(MyReducer.class);
+    job.setCombinerClass(MyCombiner.class);
     job.setReducerClass(MyReducer.class);
 
     // Delete the output directory if it exists already.
