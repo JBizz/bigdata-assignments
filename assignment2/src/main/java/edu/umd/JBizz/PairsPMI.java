@@ -50,20 +50,23 @@ public class PairsPMI extends Configured implements Tool {
     public void map(LongWritable key, Text value, Context context)
         throws IOException, InterruptedException {
       String line = ((Text) value).toString();
-      Text prev = null;
+      Text prev = new Text();
       Text cur;
       Text marge = new Text("*");
       StringTokenizer itr = new StringTokenizer(line);
 
       while (itr.hasMoreTokens()) {
-        cur = new Text(itr.nextToken());
-        if(prev != null){
-          PAIRS.set(cur, prev);
-          MARGE.set(cur, marge);
-          context.write(PAIRS,ONE);
-          context.write(MARGE,ONE);
+        if(prev == null){
+          prev = new Text(itr.nextToken());
+          cur = new Text(itr.nextToken());
         }
-        prev = cur;
+        else{
+          cur = new Text(itr.nextToken());
+        }
+        PAIRS.set(cur, prev);
+        MARGE.set(cur, marge);
+        context.write(PAIRS,ONE);
+        context.write(MARGE,ONE);
       }
     }
   }
@@ -144,7 +147,7 @@ public class PairsPMI extends Configured implements Tool {
     }
   }*/
 
-  public static class GroupComparator extends WritableComparator {
+  /*public static class GroupComparator extends WritableComparator {
     protected GroupComparator() {
       super(TextPair.class, true);
     }
@@ -156,7 +159,7 @@ public class PairsPMI extends Configured implements Tool {
 
       return tp1.getFirst().compareTo(tp2.getFirst());
     }
-  }
+  }*/
 
   public static class MyPartitioner extends Partitioner<TextPair, IntWritable>{
     @Override
@@ -231,7 +234,7 @@ public class PairsPMI extends Configured implements Tool {
     job.setMapperClass(MyMapper.class);
     job.setPartitionerClass(MyPartitioner .class);
     //job.setSortComparatorClass(KeyComparator.class);
-    job.setGroupingComparatorClass(GroupComparator.class);
+    job.setGroupingComparatorClass(TextPair.FirstComparator.class);
     job.setCombinerClass(MyCombiner.class);
     job.setReducerClass(MyReducer.class);
 
