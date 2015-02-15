@@ -121,7 +121,7 @@ public class PairsPMI extends Configured implements Tool {
     }
   }
 
-  public static class KeyComparator extends WritableComparator {
+  /*public class KeyComparator extends WritableComparator {
     protected KeyComparator() {
       super(TextPair.class, true); 
     }
@@ -142,9 +142,9 @@ public class PairsPMI extends Configured implements Tool {
       }
       return tp1.compareTo(tp2);
     }
-  }
+  }*/
 
-  public static class GroupComparator extends WritableComparator {
+  public class GroupComparator extends WritableComparator {
     protected GroupComparator() {
       super(TextPair.class, true);
     }
@@ -153,7 +153,7 @@ public class PairsPMI extends Configured implements Tool {
       TextPair tp1 = (TextPair) w1;
       TextPair tp2 = (TextPair) w2;
 
-      return tp1.compareTo(tp2);
+      return tp1.getFirst().compareTo(tp2.getSecond());
     }
   }
 
