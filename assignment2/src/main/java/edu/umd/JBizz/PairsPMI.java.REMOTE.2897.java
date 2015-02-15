@@ -4,7 +4,6 @@ import java.io.IOException;
 
 import java.util.Iterator;
 import java.util.StringTokenizer;
-import java.util.Arrays;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -23,12 +22,10 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.log4j.Logger;
 
@@ -50,21 +47,21 @@ public class PairsPMI extends Configured implements Tool {
     public void map(LongWritable key, Text value, Context context)
         throws IOException, InterruptedException {
       String line = ((Text) value).toString();
-      Text prev = new Text();
+      Text prev;
       Text cur;
-      Text marge = new Text("*");
+      Text marge = "*";
       StringTokenizer itr = new StringTokenizer(line);
 
       while (itr.hasMoreTokens()) {
         if(prev == null){
-          prev = new Text(itr.nextToken());
-          cur = new Text(itr.nextToken());
+          prev = itr.nextToken();
+          cur = itr.nextToken();
         }
         else{
-          cur = new Text(itr.nextToken());
+          cur = itr.nextToken();
         }
         PAIRS.set(cur, prev);
-        MARGE.set(cur, marge);
+        MARGE.set(cur, "*");
         context.write(PAIRS,ONE);
         context.write(MARGE,ONE);
       }
@@ -90,8 +87,8 @@ public class PairsPMI extends Configured implements Tool {
         while (iter.hasNext()) {
           sum += iter.next().get();
         }
-        COUNT.set(sum);
-        context.write(key, COUNT);
+        SUM.set(sum);
+        context.write(key, SUM);
     }
   }
 
@@ -132,14 +129,14 @@ public class PairsPMI extends Configured implements Tool {
     public int compare(WritableComparable w1, WritableComparable w2){
       TextPair tp1 = (TextPair) w1;
       TextPair tp2 = (TextPair) w2;
-      if(tp1.getSecond().equals("*") && tp2.getSecond().equals("*")){
+      if(tp1.getSecond.equals("*") && tp2.getSecond.equals("*")){
         return 0;
       }
       else{
         if (tp1.getSecond().equals("*")){
           return -1;
         } 
-        if (tp1.getSecond().equals("*")){
+        if (tp.getSecond.equals("*")){
           return 1;
         }
       }
@@ -156,13 +153,11 @@ public class PairsPMI extends Configured implements Tool {
       TextPair tp1 = (TextPair) w1;
       TextPair tp2 = (TextPair) w2;
 
-
-      return tp1.getFirst().compareTo(tp2.getFirst());
       return tp1.getFirst().compareTo(tp2.getSecond());
     }
   }
 
-  protected class MyPartitioner extends Partitioner<TextPair, IntWritable>{
+  protected static class MyPartitioner extends Partitioner<TextPair, IntWritable>{
     @Override
     public int getPartition(TextPair key, IntWritable value, int numReduceTasks){
       return (key.hashCode() & Integer.MAX_VALUE) % numReduceTasks;

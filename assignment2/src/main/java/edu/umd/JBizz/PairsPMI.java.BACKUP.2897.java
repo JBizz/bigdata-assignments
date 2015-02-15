@@ -156,9 +156,11 @@ public class PairsPMI extends Configured implements Tool {
       TextPair tp1 = (TextPair) w1;
       TextPair tp2 = (TextPair) w2;
 
-
+<<<<<<< HEAD
       return tp1.getFirst().compareTo(tp2.getFirst());
+=======
       return tp1.getFirst().compareTo(tp2.getSecond());
+>>>>>>> a009ba4fa1fc4880293130c91a22900c1d7f5cad
     }
   }
 

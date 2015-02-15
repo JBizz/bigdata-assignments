@@ -2,6 +2,7 @@ package edu.umd.JBizz;
 
 import java.io.*;
 import org.apache.hadoop.io.*;
+import org.w3c.dom.Text;
 
 public class TextPair implements WritableComparable<TextPair> {
 
@@ -60,6 +61,7 @@ public class TextPair implements WritableComparable<TextPair> {
 	}
 
 	@Override
+<<<<<<< HEAD
     public int compareTo(TextPair tp){
         if(second.equals("*") && tp.getSecond().equals("*")){
             return 0;
@@ -77,6 +79,7 @@ public class TextPair implements WritableComparable<TextPair> {
         }
         return first.compareTo(tp.getFirst());
     }
+=======
 	public String toString(){
 		return first + "\t" + second;
 	}
@@ -99,4 +102,5 @@ public class TextPair implements WritableComparable<TextPair> {
 		}
 		return first.equals(tp.getFirst());
 	}
+>>>>>>> a009ba4fa1fc4880293130c91a22900c1d7f5cad
 }
