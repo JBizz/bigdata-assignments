@@ -18,6 +18,8 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -31,59 +33,68 @@ import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.log4j.Logger;
+import tl.lin.data.pair.PairOfStrings;
 
-import edu.umd.JBizz.*;
 
 
 public class PairsPMI extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(PairsPMI.class);
 
-  // Mapper: emits (token, 1) for every word occurrence.
-  private static class MyMapper extends Mapper<LongWritable, Text, TextPair, IntWritable> {
+  private static class MyMapper extends Mapper<LongWritable, Text, PairOfStrings, IntWritable> {
 
     // Reuse objects to save overhead of object creation.
     private final static IntWritable ONE = new IntWritable(1);
-    private final static TextPair PAIRS = new TextPair();
-    private final static TextPair MARGE = new TextPair();
+    //private final static TextPair PAIRS = new TextPair();
+    private final static PairOfStrings MARGE = new PairOfStrings();
+    private static final PairOfStrings PAIR = new PairOfStrings();
 
     @Override
     public void map(LongWritable key, Text value, Context context)
         throws IOException, InterruptedException {
-      String line = ((Text) value).toString();
-      Text prev = new Text();
-      Text cur;
-      Text marge = new Text("*");
-      StringTokenizer itr = new StringTokenizer(line);
+        String line = ((Text) value).toString();
+        String[] terms = line.split("\\s+");
 
-      while (itr.hasMoreTokens()) {
-        if(prev == null){
-          prev = new Text(itr.nextToken());
-          cur = new Text(itr.nextToken());
+        String prev = null;
+        String cur;
+        String marge = "!";
+
+        for (int i = 0; i < terms.length; i++){
+          String term = terms[i];
+          String[] usedTerms = new String[terms.length];
+
+          if(term.length() == 0)
+            continue;
+          for(int j = i - 2; j < i + 3; j++){
+            if(j == i || j <0)
+              continue;
+
+            if(j >= terms.length)
+              break;
+
+            if(terms[j].length() == 0)
+              continue;
+
+            //no double reporting a single line coocurrence
+            if(Arrays.asList(usedTerms).contains(terms[j]))
+              continue;
+
+            PAIR.set(term, terms[j]);
+            context.write(PAIR, ONE);
+            PAIR.set(term, marge);
+            context.write(PAIR,ONE);
+
+            usedTerms[j] = new String(terms[j]);
+          }
         }
-        else{
-          cur = new Text(itr.nextToken());
-        }
-        PAIRS.set(cur, prev);
-        MARGE.set(cur, marge);
-        context.write(PAIRS,ONE);
-        context.write(MARGE,ONE);
       }
     }
-  }
+  
 
-  //public static class PairPartitionFromFirst extends Partitioner<TextPair, IntWritable> {
-    //@Override
-    //public int getPartition(TextPair key, IntWritable value, int numOfReducers){
-
-    //}
-  //}
-
-  private static class MyCombiner extends Reducer<TextPair, IntWritable, TextPair, IntWritable>{
+  private static class MyCombiner extends Reducer<PairOfStrings, IntWritable, PairOfStrings, IntWritable>{
     private final static IntWritable COUNT = new IntWritable();
-    private final static TextPair PAIRS = new TextPair();
 
     @Override
-    public void reduce(TextPair key, Iterable<IntWritable> values, Context context) 
+    public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context) 
       throws IOException, InterruptedException {
         Iterator<IntWritable> iter = values.iterator();
         int sum = 0;
@@ -96,75 +107,82 @@ public class PairsPMI extends Configured implements Tool {
   }
 
   // Reducer: sums up all the counts.
-  private static class MyReducer extends Reducer<TextPair, IntWritable, TextPair, IntWritable> {
+  private static class MyReducer extends Reducer<PairOfStrings, IntWritable, PairOfStrings, DoubleWritable> {
 
     // Reuse objects.
     private final static IntWritable SUM = new IntWritable();
     private final static IntWritable MARGESUM = new IntWritable();
+    private final static DoubleWritable PMI = new DoubleWritable();
 
     @Override
-    public void reduce(TextPair key, Iterable<IntWritable> values, Context context)
+    public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
         throws IOException, InterruptedException {
       // Sum up values.
       Iterator<IntWritable> iter = values.iterator();
       int sum = 0;
       int margeSum = 0;
       while (iter.hasNext()) {
-        if(key.getSecond().equals("*")){
-          margeSum += iter.next().get();
-          MARGESUM.set(margeSum);
-        }
-        else{
-        
-          sum += iter.next().get();
-        }
+        sum += iter.next().get();
       }
-      SUM.set(sum);
-      context.write(key, SUM);
+      if(key.getValue().equals("!")){
+          MARGESUM.set(sum);
+          PMI.set((float) sum);
+          context.write(key, PMI);
+      }
+      if(!key.getValue().equals("!")){
+        float sumFloat = sum;
+        float margeFLoat = MARGESUM.get();
+        double pmi = Math.log10(sumFloat/margeFLoat);
+        PMI.set(pmi);
+        context.write(key, PMI);
+      }
     }
   }
 
-  /*public class KeyComparator extends WritableComparator {
+  public static class KeyComparator extends WritableComparator {
     protected KeyComparator() {
-      super(TextPair.class, true); 
+      super(PairOfStrings.class, true);
     }
     @Override
     public int compare(WritableComparable w1, WritableComparable w2){
-      TextPair tp1 = (TextPair) w1;
-      TextPair tp2 = (TextPair) w2;
-      if(tp1.getSecond().equals("*") && tp2.getSecond().equals("*")){
-        return 0;
+        PairOfStrings tp1 = (PairOfStrings) w1;
+        PairOfStrings tp2 = (PairOfStrings) w2;
+      
+      int cmp = tp1.getKey().compareTo(tp2.getKey());
+      if(cmp != 0){
+        return cmp;
+      }
+      if(tp1.getValue().equals("*") && tp2.getValue().equals("*")){
+            return 0;
       }
       else{
-        if (tp1.getSecond().equals("*")){
+        if (tp1.getValue().equals("*")){
           return -1;
-        } 
-        if (tp1.getSecond().equals("*")){
+        }
+        if (tp2.getValue().equals("*")){
           return 1;
         }
       }
-      return tp1.compareTo(tp2);
+      return tp1.getValue().compareTo(tp2.getValue());
     }
-  }*/
+  }
 
-  /*public static class GroupComparator extends WritableComparator {
+  public static class GroupComparator extends WritableComparator {
     protected GroupComparator() {
-      super(TextPair.class, true);
+      super(PairOfStrings.class, true);
     }
     @Override
     public int compare(WritableComparable w1, WritableComparable w2){
-      TextPair tp1 = (TextPair) w1;
-      TextPair tp2 = (TextPair) w2;
-
-
-      return tp1.getFirst().compareTo(tp2.getFirst());
+      PairOfStrings tp1 = (PairOfStrings) w1;
+      PairOfStrings tp2 = (PairOfStrings) w2;
+      return tp1.getKey().compareTo(tp2.getKey());
     }
-  }*/
+  }
 
-  public static class MyPartitioner extends Partitioner<TextPair, IntWritable>{
+  public static class MyPartitioner extends Partitioner<PairOfStrings, IntWritable>{
     @Override
-    public int getPartition(TextPair key, IntWritable value, int numReduceTasks){
-      return (key.hashCode() & Integer.MAX_VALUE) % numReduceTasks;
+    public int getPartition(PairOfStrings key, IntWritable value, int numReduceTasks){
+      return (key.getLeftElement().hashCode() & Integer.MAX_VALUE) % numReduceTasks;
     }
   }
   /**
@@ -228,13 +246,13 @@ public class PairsPMI extends Configured implements Tool {
     FileInputFormat.setInputPaths(job, new Path(inputPath));
     FileOutputFormat.setOutputPath(job, new Path(outputPath));
  
-    job.setOutputKeyClass(TextPair.class);
+    job.setOutputKeyClass(PairOfStrings.class);
     job.setOutputValueClass(IntWritable.class);
 
     job.setMapperClass(MyMapper.class);
     job.setPartitionerClass(MyPartitioner .class);
     //job.setSortComparatorClass(KeyComparator.class);
-    job.setGroupingComparatorClass(TextPair.FirstComparator.class);
+    //job.setGroupingComparatorClass(GroupComparator.class);
     job.setCombinerClass(MyCombiner.class);
     job.setReducerClass(MyReducer.class);
 
