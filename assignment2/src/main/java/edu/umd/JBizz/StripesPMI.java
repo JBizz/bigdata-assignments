@@ -125,6 +125,7 @@ public class StripesPMI extends Configured implements Tool {
       for (String key : keys){
         int fromCount = map.get(key);
         if(adder.containsKey(key)){
+          //map.plus(add the two into new HM)
           int count = adder.get(key);
           COUNT.set(COUNT.get() + count;
           count = count + fromCount;
