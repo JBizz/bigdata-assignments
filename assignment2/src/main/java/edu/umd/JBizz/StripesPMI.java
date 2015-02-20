@@ -21,6 +21,7 @@ import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -149,28 +150,20 @@ public class StripesPMI extends Configured implements Tool {
     public void setup(Context context) throws IOException {
 
       FileSystem fs = FileSystem.get(context.getConfiguration());
-      File path = new File("tempFile");
-      for (File f : path.listFiles()){
-        Path fPath = new Path(f.getAbsolutePath());
-        //LOG.info(fPath.toString());
-        BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(fPath)));
-        try{
-          String line;
+      //File path = new File("tempFile");
+      FileStatus[] status_list = fs.listStatus(new Path("tempFile"));
+      for(FileStatus status : status_list){
+        BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(status.getPath())));
+        String line = br.readLine();
+        while(line != null){
+          String[] lineSplit = line.split("\\s+");
+          String key = lineSplit[0];
+          float value = Float.parseFloat(lineSplit[1]);
+          MAPVALUE.set(value);
+          keyToProb.put(key, MAPVALUE);
           line = br.readLine();
-          while(line != null){
-
-            if(!(fPath.toString().contains("_") || fPath.toString().contains("."))){
-              String[] lineSplit = line.split("\\s+");
-              String key = lineSplit[0];
-              float value = Float.parseFloat(lineSplit[1]);
-              MAPVALUE.set(value);
-              keyToProb.put(key, MAPVALUE);
-            }
-            line = br.readLine();
-          }
-        }finally {
-          br.close();
         }
+        br.close();
       }
     }
 

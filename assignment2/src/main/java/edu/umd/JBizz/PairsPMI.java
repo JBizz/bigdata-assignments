@@ -135,6 +135,7 @@ public class PairsPMI extends Configured implements Tool {
           MARGESUM.set(sum);
           float countHolder = sum;
           float totalHolder = TOTAL.get();
+          LOG.info(totalHolder);
           PMI.set((float) countHolder/totalHolder);
           Text textKey = new Text(key.getLeftElement());
           context.write(textKey, PMI); 
