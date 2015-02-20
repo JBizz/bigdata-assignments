@@ -1,11 +1,15 @@
 package edu.umd.JBizz;
 
 import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.File;
 
 import java.util.Iterator;
 import java.util.StringTokenizer;
 import java.util.Arrays;
 import java.util.Set;
+import java.util.HashMap;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -42,6 +46,7 @@ import tl.lin.data.map.HMapStFW;
 
 public class StripesPMI extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(PairsPMI.class);
+  private static final IntWritable TOTAL = new IntWritable(0);
 
   private static class MyMapper extends Mapper<LongWritable, Text, Text, HMapStIW> {
 
@@ -74,7 +79,7 @@ public class StripesPMI extends Configured implements Tool {
 
             MAP.increment(terms[j]);
           }
-
+          TOTAL.set(TOTAL.get() + 1);
           KEY.set(term);
           context.write(KEY,MAP);
         }
@@ -100,48 +105,105 @@ public class StripesPMI extends Configured implements Tool {
   // Reducer: sums up all the counts.
   //REDUCER inspired by code from http://codingjunkie.net/cooccurrence/
   //And of course Prof Lin's code.
-  private static class MyReducer extends Reducer<Text, HMapStIW, Text, HMapStFW> {
+  private static class MyReducer extends Reducer<Text, HMapStIW, Text, FloatWritable> {
 
-    private final static HMapStIW adder = new HMapStIW();
-    private final static HMapStFW PMIMAP = new HMapStFW();
-    private final static IntWritable COUNT = new IntWritable();
+    //private final static HMapStIW adder = new HMapStIW();
+    private final static FloatWritable SINGLEPROB = new FloatWritable();
+    private final static IntWritable COUNT = new IntWritable(0);
 
     @Override
     public void reduce(Text key, Iterable<HMapStIW> values, Context context)
         throws IOException, InterruptedException {
-      adder.clear();
-      for(HMapStIW value : values){
-        addAll(value);
+      //adder.clear();
+      Iterator<HMapStIW> iter = values.iterator();
+      HMapStIW adder = new HMapStIW();
+      while(iter.hasNext()) {
+        adder.plus(iter.next());
       }
-      for(HMapStIW value : values){
-        calcPMI(value);
+      //for(HMapStIW value : values){
+        //adder.plus(value);
+      //}
+      Set<String> mapkeys = adder.keySet();
+      int sum = 0;
+      for (String mapkey : mapkeys){
+        sum = sum + adder.get(mapkey);
       }
-      //now do pmi
-      context.write(key, PMIMAP);
+      COUNT.set(sum);
 
+      float countHold = COUNT.get();
+      float totalHold = TOTAL.get();
+      SINGLEPROB.set((countHold/totalHold));
+
+      context.write(key, SINGLEPROB);
     }
-    private void addAll(HMapStIW map){
-      Set<String> keys = map.keySet();
-      for (String key : keys){
-        int fromCount = map.get(key);
-        if(adder.containsKey(key)){
-          //map.plus(add the two into new HM)
-          int count = adder.get(key);
-          COUNT.set(COUNT.get() + count;
-          count = count + fromCount;
-        } else {
-          adder.put(key, fromCount);
+  }
+
+  private static class MyReducer2 extends Reducer<Text, HMapStIW, Text, HMapStFW> {
+    //private final static IntWritable SUM = new IntWritable();
+    //private final static IntWritable MARGESUM = new IntWritable();
+    private final static FloatWritable PMI = new FloatWritable();
+    private static final FloatWritable MAPVALUE = new FloatWritable();
+    private final static HashMap<String, FloatWritable> keyToProb = new HashMap<String, FloatWritable>();
+
+    @Override
+    public void setup(Context context) throws IOException {
+
+      FileSystem fs = FileSystem.get(context.getConfiguration());
+      File path = new File("tempFile");
+      for (File f : path.listFiles()){
+        Path fPath = new Path(f.getAbsolutePath());
+        LOG.info(fPath.toString());
+        BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(fPath)));
+        try{
+          String line;
+          line = br.readLine();
+          while(line != null){
+
+            if(!(fPath.toString().contains("_") || fPath.toString().contains("."))){
+              String[] lineSplit = line.split("\\s+");
+              String key = lineSplit[0];
+              float value = Float.parseFloat(lineSplit[1]);
+              MAPVALUE.set(value);
+              keyToProb.put(key, MAPVALUE);
+            }
+            line = br.readLine();
+          }
+        }finally {
+          br.close();
         }
       }
     }
-    private void calcPMI(HMapStIW map){
-      Set<String> keys = map.keySet();
-      for(String key : keys){
-        float pmi = (float) Math.log10(map.get(key)/COUNT.get());
-        PMIMAP.put(key, pmi);
+
+
+      @Override
+      public void reduce(Text key, Iterable<HMapStIW> values, Context context)
+          throws IOException, InterruptedException {
+        
+        Iterator<HMapStIW> iter = values.iterator();
+        HMapStIW adder = new HMapStIW();
+        while(iter.hasNext()) {
+          adder.plus(iter.next());
+        }
+        HMapStFW pmiMap = new HMapStFW();
+        //for(HMapStIW value : values){
+          //adder.plus(value);
+        //}
+        Set<String> mapkeys = adder.keySet();
+        int sum = 0;
+        for (String mapkey : mapkeys){
+          float countHold = adder.get(mapkey);
+          float totalHold = TOTAL.get();
+          float pairProb = countHold/totalHold;
+          float leftString = keyToProb.get(key.toString()).get();
+          float rightString = keyToProb.get(mapkey).get();
+          float pmi = (float) Math.log10(pairProb/(leftString*rightString));
+          pmiMap.put(mapkey, pmi);
+        }
+
+        context.write(key, pmiMap);
       }
     }
-  }
+
 
   /**
    * Creates an instance of this tool.
@@ -190,6 +252,8 @@ public class StripesPMI extends Configured implements Tool {
     int reduceTasks = cmdline.hasOption(NUM_REDUCERS) ?
         Integer.parseInt(cmdline.getOptionValue(NUM_REDUCERS)) : 1;
 
+    String tempOut = "tempFile";
+
     LOG.info("Tool: " + StripesPMI.class.getSimpleName());
     LOG.info(" - input path: " + inputPath);
     LOG.info(" - output path: " + outputPath);
@@ -202,21 +266,48 @@ public class StripesPMI extends Configured implements Tool {
     job.setNumReduceTasks(reduceTasks);
 
     FileInputFormat.setInputPaths(job, new Path(inputPath));
-    FileOutputFormat.setOutputPath(job, new Path(outputPath));
- 
+    FileOutputFormat.setOutputPath(job, new Path(tempOut));
+    
+    job.setMapOutputKeyClass(Text.class);
+    job.setMapOutputValueClass(HMapStIW.class);
     job.setOutputKeyClass(Text.class);
-    job.setOutputValueClass(HMapStIW.class);
+    job.setOutputValueClass(FloatWritable.class);
 
     job.setMapperClass(MyMapper.class);
     job.setCombinerClass(MyCombiner.class);
     job.setReducerClass(MyReducer.class);
 
     // Delete the output directory if it exists already.
-    Path outputDir = new Path(outputPath);
+    Path outputDir = new Path(tempOut);
     FileSystem.get(conf).delete(outputDir, true);
 
     long startTime = System.currentTimeMillis();
     job.waitForCompletion(true);
+
+    Configuration conf2 = getConf();
+    Job job2 = Job.getInstance(conf2);
+    job2.setJobName(StripesPMI.class.getSimpleName());
+    job2.setJarByClass(StripesPMI.class);
+
+    job2.setNumReduceTasks(reduceTasks);
+
+    FileInputFormat.setInputPaths(job2, new Path(inputPath));
+    FileOutputFormat.setOutputPath(job2, new Path(outputPath));
+    
+    job2.setMapOutputKeyClass(Text.class);
+    job2.setMapOutputValueClass(HMapStIW.class);
+    job2.setOutputKeyClass(Text.class);
+    job2.setOutputValueClass(HMapStFW.class);
+
+    job2.setMapperClass(MyMapper.class);
+    job2.setCombinerClass(MyCombiner.class);
+    job2.setReducerClass(MyReducer2.class);
+
+    // Delete the output directory if it exists already.
+    Path outputDir2 = new Path(outputPath);
+    FileSystem.get(conf2).delete(outputDir2, true);
+    job2.waitForCompletion(true);
+
     LOG.info("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
 
     return 0;

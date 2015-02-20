@@ -1,10 +1,15 @@
 package edu.umd.JBizz;
 
 import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.File;
 
 import java.util.Iterator;
 import java.util.StringTokenizer;
 import java.util.Arrays;
+import java.util.HashMap;
+
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -22,6 +27,7 @@ import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -37,14 +43,14 @@ import tl.lin.data.pair.PairOfStrings;
 
 
 
+
 public class PairsPMI extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(PairsPMI.class);
-
+  private final static IntWritable TOTAL = new IntWritable(0);
   private static class MyMapper extends Mapper<LongWritable, Text, PairOfStrings, IntWritable> {
 
     // Reuse objects to save overhead of object creation.
     private final static IntWritable ONE = new IntWritable(1);
-    //private final static TextPair PAIRS = new TextPair();
     private final static PairOfStrings MARGE = new PairOfStrings();
     private static final PairOfStrings PAIR = new PairOfStrings();
 
@@ -77,7 +83,7 @@ public class PairsPMI extends Configured implements Tool {
             //no double reporting a single line coocurrence
             if(Arrays.asList(usedTerms).contains(terms[j]))
               continue;
-
+            TOTAL.set(TOTAL.get() + 1);
             PAIR.set(term, terms[j]);
             context.write(PAIR, ONE);
             PAIR.set(term, marge);
@@ -107,12 +113,12 @@ public class PairsPMI extends Configured implements Tool {
   }
 
   // Reducer: sums up all the counts.
-  private static class MyReducer extends Reducer<PairOfStrings, IntWritable, PairOfStrings, DoubleWritable> {
+  private static class MyReducer extends Reducer<PairOfStrings, IntWritable, Text, FloatWritable> {
 
     // Reuse objects.
     private final static IntWritable SUM = new IntWritable();
     private final static IntWritable MARGESUM = new IntWritable();
-    private final static DoubleWritable PMI = new DoubleWritable();
+    private final static FloatWritable PMI = new FloatWritable();
 
     @Override
     public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
@@ -126,56 +132,74 @@ public class PairsPMI extends Configured implements Tool {
       }
       if(key.getValue().equals("!")){
           MARGESUM.set(sum);
-          PMI.set((float) sum);
+          PMI.set((float) MARGESUM.get()/TOTAL.get());
+          Text textKey = new Text(key.getLeftElement());
+          context.write(textKey, PMI);
+      }
+    }
+  }
+
+  private static class MyReducer2 extends Reducer<PairOfStrings, IntWritable, PairOfStrings, FloatWritable> {
+    private final static IntWritable SUM = new IntWritable();
+    private final static IntWritable MARGESUM = new IntWritable();
+    private final static FloatWritable PMI = new FloatWritable();
+    private static final FloatWritable MAPVALUE = new FloatWritable();
+    private final static HashMap<String, FloatWritable> keyToProb = new HashMap<String, FloatWritable>();
+
+    @Override
+    public void setup(Context context) throws IOException {
+
+      FileSystem fs = FileSystem.get(context.getConfiguration());
+      File path = new File("tempFile");
+      for (File f : path.listFiles()){
+        Path fPath = new Path(f.getAbsolutePath());
+        LOG.info(fPath.toString());
+        BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(fPath)));
+        try{
+          String line;
+          line = br.readLine();
+          while(line != null){
+
+            if(!(fPath.toString().contains("_") || fPath.toString().contains("."))){
+              String[] lineSplit = line.split("\\s+");
+              String key = lineSplit[0];
+              float value = Float.parseFloat(lineSplit[1]);
+              MAPVALUE.set(value);
+              keyToProb.put(key, MAPVALUE);
+            }
+            line = br.readLine();
+          }
+        }finally {
+          br.close();
+        }
+      }
+    }
+
+    @Override
+    public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
+        throws IOException, InterruptedException {
+      // Sum up values.
+      Iterator<IntWritable> iter = values.iterator();
+      int sum = 0;
+      int margeSum = 0;
+      while (iter.hasNext()) {
+        sum += iter.next().get();
+      }
+      if(key.getValue().equals("!")){
+          //float pmiHolder = keyToProb.get(key.getLeftElement()).get();
+          PMI.set(keyToProb.get(key.getLeftElement()).get());
           context.write(key, PMI);
       }
       if(!key.getValue().equals("!")){
         float sumFloat = sum;
-        float margeFLoat = MARGESUM.get();
-        double pmi = Math.log10(sumFloat/margeFLoat);
+        float pairProb = sumFloat / TOTAL.get();
+        //float margeFLoat = MARGESUM.get();
+        float leftString = keyToProb.get(key.getLeftElement()).get();
+        float rightString = keyToProb.get(key.getRightElement()).get();
+        float pmi = (float)Math.log10(pairProb/(leftString*rightString));
         PMI.set(pmi);
         context.write(key, PMI);
       }
-    }
-  }
-
-  public static class KeyComparator extends WritableComparator {
-    protected KeyComparator() {
-      super(PairOfStrings.class, true);
-    }
-    @Override
-    public int compare(WritableComparable w1, WritableComparable w2){
-        PairOfStrings tp1 = (PairOfStrings) w1;
-        PairOfStrings tp2 = (PairOfStrings) w2;
-      
-      int cmp = tp1.getKey().compareTo(tp2.getKey());
-      if(cmp != 0){
-        return cmp;
-      }
-      if(tp1.getValue().equals("*") && tp2.getValue().equals("*")){
-            return 0;
-      }
-      else{
-        if (tp1.getValue().equals("*")){
-          return -1;
-        }
-        if (tp2.getValue().equals("*")){
-          return 1;
-        }
-      }
-      return tp1.getValue().compareTo(tp2.getValue());
-    }
-  }
-
-  public static class GroupComparator extends WritableComparator {
-    protected GroupComparator() {
-      super(PairOfStrings.class, true);
-    }
-    @Override
-    public int compare(WritableComparable w1, WritableComparable w2){
-      PairOfStrings tp1 = (PairOfStrings) w1;
-      PairOfStrings tp2 = (PairOfStrings) w2;
-      return tp1.getKey().compareTo(tp2.getKey());
     }
   }
 
@@ -232,6 +256,8 @@ public class PairsPMI extends Configured implements Tool {
     int reduceTasks = cmdline.hasOption(NUM_REDUCERS) ?
         Integer.parseInt(cmdline.getOptionValue(NUM_REDUCERS)) : 1;
 
+    String tempOut = "tempFile";
+
     LOG.info("Tool: " + PairsPMI.class.getSimpleName());
     LOG.info(" - input path: " + inputPath);
     LOG.info(" - output path: " + outputPath);
@@ -244,24 +270,54 @@ public class PairsPMI extends Configured implements Tool {
     job.setNumReduceTasks(reduceTasks);
 
     FileInputFormat.setInputPaths(job, new Path(inputPath));
-    FileOutputFormat.setOutputPath(job, new Path(outputPath));
- 
-    job.setOutputKeyClass(PairOfStrings.class);
-    job.setOutputValueClass(IntWritable.class);
+    FileOutputFormat.setOutputPath(job, new Path(tempOut));
+    //MapFileOutputFormat.setOutputPath(job, new Path(tempOut));
+    job.setMapOutputKeyClass(PairOfStrings.class);
+    job.setMapOutputValueClass(IntWritable.class);
+    job.setOutputKeyClass(Text.class);
+    job.setOutputValueClass(FloatWritable.class);
+    //job.setOutputFormatClass(MapFileOutputFormat.class);
+    
 
     job.setMapperClass(MyMapper.class);
     job.setPartitionerClass(MyPartitioner .class);
-    //job.setSortComparatorClass(KeyComparator.class);
-    //job.setGroupingComparatorClass(GroupComparator.class);
     job.setCombinerClass(MyCombiner.class);
     job.setReducerClass(MyReducer.class);
 
     // Delete the output directory if it exists already.
-    Path outputDir = new Path(outputPath);
+    Path outputDir = new Path(tempOut);
     FileSystem.get(conf).delete(outputDir, true);
 
     long startTime = System.currentTimeMillis();
     job.waitForCompletion(true);
+    //run second here
+
+
+    Configuration conf2 = getConf();
+    Job job2 = Job.getInstance(conf2);
+    job2.setJobName(PairsPMI.class.getSimpleName());
+    job2.setJarByClass(PairsPMI.class);
+
+    job2.setNumReduceTasks(reduceTasks);
+
+    FileInputFormat.setInputPaths(job2, new Path(inputPath));
+    FileOutputFormat.setOutputPath(job2, new Path(outputPath));
+    job2.setMapOutputKeyClass(PairOfStrings.class);
+    job2.setMapOutputValueClass(IntWritable.class);
+    job2.setOutputKeyClass(PairOfStrings.class);
+    job2.setOutputValueClass(FloatWritable.class);
+
+
+    job2.setMapperClass(MyMapper.class);
+    job2.setPartitionerClass(MyPartitioner .class);
+    job2.setCombinerClass(MyCombiner.class);
+    job2.setReducerClass(MyReducer2.class);
+
+    // Delete the output directory if it exists already.
+    Path outputDir2 = new Path(outputPath);
+    FileSystem.get(conf2).delete(outputDir2, true);
+
+    job2.waitForCompletion(true);
     LOG.info("Job Finished in " + (System.currentTimeMillis() - startTime) / 1000.0 + " seconds");
 
     return 0;
