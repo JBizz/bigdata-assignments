@@ -137,7 +137,7 @@ public class PairsPMI extends Configured implements Tool {
           float totalHolder = TOTAL.get();
           PMI.set((float) countHolder/totalHolder);
           Text textKey = new Text(key.getLeftElement());
-          context.write(textKey, PMI);
+          context.write(textKey, PMI); 
       }
     }
   }
