@@ -45,7 +45,7 @@ import tl.lin.data.map.HMapStFW;
 
 
 public class StripesPMI extends Configured implements Tool {
-  private static final Logger LOG = Logger.getLogger(PairsPMI.class);
+  private static final Logger LOG = Logger.getLogger(StripesPMI.class);
   private static final IntWritable TOTAL = new IntWritable(0);
 
   private static class MyMapper extends Mapper<LongWritable, Text, Text, HMapStIW> {
@@ -152,7 +152,7 @@ public class StripesPMI extends Configured implements Tool {
       File path = new File("tempFile");
       for (File f : path.listFiles()){
         Path fPath = new Path(f.getAbsolutePath());
-        LOG.info(fPath.toString());
+        //LOG.info(fPath.toString());
         BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(fPath)));
         try{
           String line;
@@ -194,6 +194,7 @@ public class StripesPMI extends Configured implements Tool {
           float countHold = adder.get(mapkey);
           float totalHold = TOTAL.get();
           float pairProb = countHold/totalHold;
+          //LOG.info(key.toString());
           float leftString = keyToProb.get(key.toString()).get();
           float rightString = keyToProb.get(mapkey).get();
           float pmi = (float) Math.log10(pairProb/(leftString*rightString));
