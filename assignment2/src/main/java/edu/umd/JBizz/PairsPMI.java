@@ -133,7 +133,9 @@ public class PairsPMI extends Configured implements Tool {
       }
       if(key.getValue().equals("!")){
           MARGESUM.set(sum);
-          PMI.set((float) MARGESUM.get()/TOTAL.get());
+          float countHolder = sum;
+          float totalHolder = TOTAL.get();
+          PMI.set((float) countHolder/totalHolder);
           Text textKey = new Text(key.getLeftElement());
           context.write(textKey, PMI);
       }
@@ -166,30 +168,6 @@ public class PairsPMI extends Configured implements Tool {
         }
         br.close();
       }
-      
-      //for (File f : path.listFiles()){
-        //Path fPath = new Path(f.getAbsolutePath());
-        //LOG.info(fPath.toString());
-        //BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(fPath)));
-
-        //try{
-          //String line;
-          //line = br.readLine();
-          //while(line != null){
-
-            //if(!(fPath.toString().contains("_") || fPath.toString().contains("."))){
-              //String[] lineSplit = line.split("\\s+");
-              //String key = lineSplit[0];
-              //float value = Float.parseFloat(lineSplit[1]);
-              //MAPVALUE.set(value);
-              //keyToProb.put(key, MAPVALUE);
-            //}
-            //line = br.readLine();
-          //}
-        //}finally {
-          //br.close();
-        //}
-      //}
     }
 
     @Override
