@@ -50,6 +50,9 @@ public class PairsPMI extends Configured implements Tool {
   private final static IntWritable TOTAL = new IntWritable(0);
   private static class MyMapper extends Mapper<LongWritable, Text, PairOfStrings, IntWritable> {
 
+  public static enum COUNTERS {
+    TOTAL
+  }
     // Reuse objects to save overhead of object creation.
     private final static IntWritable ONE = new IntWritable(1);
     private final static PairOfStrings MARGE = new PairOfStrings();
@@ -84,7 +87,8 @@ public class PairsPMI extends Configured implements Tool {
             //no double reporting a single line coocurrence
             if(Arrays.asList(usedTerms).contains(terms[j]))
               continue;
-            TOTAL.set(TOTAL.get() + 1);
+            context.getCounter(COUNTERS.TOTAL).increment(1);
+            //TOTAL.set(TOTAL.get() + 1);
             PAIR.set(term, terms[j]);
             context.write(PAIR, ONE);
             PAIR.set(term, marge);
@@ -134,9 +138,10 @@ public class PairsPMI extends Configured implements Tool {
       if(key.getValue().equals("!")){
           MARGESUM.set(sum);
           float countHolder = sum;
-          float totalHolder = TOTAL.get();
-          LOG.info(totalHolder);
-          PMI.set((float) countHolder/totalHolder);
+          float total = job.getCounters().findCounter(COUNTERS.TOTAL).getValue().floatValue();
+          //float totalHolder = TOTAL.get();
+          //LOG.info(totalHolder);
+          PMI.set((float) countHolder/total);
           Text textKey = new Text(key.getLeftElement());
           context.write(textKey, PMI); 
       }
@@ -188,7 +193,8 @@ public class PairsPMI extends Configured implements Tool {
       }
       if(!key.getValue().equals("!")){
         float sumFloat = sum;
-        float pairProb = sumFloat / TOTAL.get();
+        float total = job.getCounters().findCounter(COUNTERS.TOTAL).getValue().floatValue();
+        float pairProb = sumFloat / total;
         //float margeFLoat = MARGESUM.get();
         float leftString = keyToProb.get(key.getLeftElement()).get();
         float rightString = keyToProb.get(key.getRightElement()).get();
