@@ -144,8 +144,11 @@ public class PairsPMI extends Configured implements Tool {
           //float total = context.getCounter().findCounter(COUNTERS.TOTAL).getValue().floatValue();
           //float totalHolder = TOTAL.get();
           //LOG.info(totalHolder);
+
           PMI.set(countHolder);
           Text textKey = new Text(key.getLeftElement());
+          //LOG.info(textKey);
+          //LOG.info(PMI);
           context.write(textKey, PMI); 
       }
     }
@@ -173,10 +176,16 @@ public class PairsPMI extends Configured implements Tool {
         String line = br.readLine();
         while(line != null){
           String[] lineSplit = line.split("\\s+");
+          //LOG.info(lineSplit);
           String key = lineSplit[0];
+          //LOG.info(lineSplit[1]);
           float value = Float.parseFloat(lineSplit[1]);
+          //LOG.info(value);
           MAPVALUE.set(value);
+          //LOG.info(MAPVALUE);
           keyToProb.put(key, MAPVALUE);
+          //LOG.info(key);
+          //LOG.info(MAPVALUE);
           line = br.readLine();
         }
         br.close();
@@ -197,19 +206,32 @@ public class PairsPMI extends Configured implements Tool {
       while (iter.hasNext()) {
         sum += iter.next().get();
       }
-      if(key.getValue().equals("!")){
+      //if(key.getValue().equals("!")){
           //float pmiHolder = keyToProb.get(key.getLeftElement()).get();
-          PMI.set(keyToProb.get(key.getLeftElement()).get());
-          context.write(key, PMI);
-      }
+          //PMI.set(keyToProb.get(key.getLeftElement()).get());
+          //context.write(key, PMI);
+      //}
       if(!key.getValue().equals("!")){
         float sumFloat = sum;
         float total = TOTAL.get();
+        //LOG.info(key);
+        //LOG.info(TOTAL);
+        //LOG.info(total);
+        //LOG.info(key.getLeftElement());
+        //LOG.info(keyToProb.get(key.getLeftElement()).get());
+        //LOG.info(key.getRightElement());
+        //LOG.info(keyToProb.get(key.getRightElement()).get());
+        //LOG.info(keyToProb.get(key.getLeftElement()).get());
+        //LOG.info(keyToProb.get(key.getRightElement()).get());
         //float total = context.getCounter().findCounter(COUNTERS.TOTAL).getValue().floatValue();
         float pairProb = sumFloat / total;
         //float margeFLoat = MARGESUM.get();
-        float leftString = (keyToProb.get(key.getLeftElement()).get()) / total;
-        float rightString = (keyToProb.get(key.getRightElement()).get()) / total;
+        String left = key.getLeftElement();
+        String right = key.getRightElement();
+        float leftString = keyToProb.get(left).get() / total;
+        float rightString = keyToProb.get(right).get() / total;
+        //float leftString = (keyToProb.get(key.getLeftElement()).get()) / total;
+        //float rightString = (keyToProb.get(key.getRightElement()).get()) / total;
         float pmi = (float)Math.log10(pairProb/(leftString*rightString));
         PMI.set(pmi);
         context.write(key, PMI);

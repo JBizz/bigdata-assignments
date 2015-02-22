@@ -32,6 +32,7 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Partitioner;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
@@ -47,7 +48,7 @@ import tl.lin.data.map.HMapStFW;
 
 public class StripesPMI extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(StripesPMI.class);
-  private static final IntWritable TOTAL = new IntWritable(0);
+  
 
   private static class MyMapper extends Mapper<LongWritable, Text, Text, HMapStIW> {
 
@@ -80,7 +81,7 @@ public class StripesPMI extends Configured implements Tool {
 
             MAP.increment(terms[j]);
           }
-          TOTAL.set(TOTAL.get() + 1);
+          //TOTAL.set(TOTAL.get() + 1);
           KEY.set(term);
           context.write(KEY,MAP);
         }
@@ -121,9 +122,7 @@ public class StripesPMI extends Configured implements Tool {
       while(iter.hasNext()) {
         adder.plus(iter.next());
       }
-      //for(HMapStIW value : values){
-        //adder.plus(value);
-      //}
+
       Set<String> mapkeys = adder.keySet();
       int sum = 0;
       for (String mapkey : mapkeys){
@@ -132,8 +131,8 @@ public class StripesPMI extends Configured implements Tool {
       COUNT.set(sum);
 
       float countHold = COUNT.get();
-      float totalHold = TOTAL.get();
-      SINGLEPROB.set((countHold/totalHold));
+      //float totalHold = TOTAL.get();
+      SINGLEPROB.set((countHold));
 
       context.write(key, SINGLEPROB);
     }
@@ -142,6 +141,7 @@ public class StripesPMI extends Configured implements Tool {
   private static class MyReducer2 extends Reducer<Text, HMapStIW, Text, HMapStFW> {
     //private final static IntWritable SUM = new IntWritable();
     //private final static IntWritable MARGESUM = new IntWritable();
+    private static final FloatWritable TOTAL = new FloatWritable(0);
     private final static FloatWritable PMI = new FloatWritable();
     private static final FloatWritable MAPVALUE = new FloatWritable();
     private final static HashMap<String, FloatWritable> keyToProb = new HashMap<String, FloatWritable>();
@@ -149,8 +149,12 @@ public class StripesPMI extends Configured implements Tool {
     @Override
     public void setup(Context context) throws IOException {
 
+      float total = Float.valueOf(context.getConfiguration().get("Total"));
+
+      //TOTAL.set(Float.valueOf(total));
+      TOTAL.set(total);
+
       FileSystem fs = FileSystem.get(context.getConfiguration());
-      //File path = new File("tempFile");
       FileStatus[] status_list = fs.listStatus(new Path("tempFile"));
       for(FileStatus status : status_list){
         BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(status.getPath())));
@@ -159,7 +163,7 @@ public class StripesPMI extends Configured implements Tool {
           String[] lineSplit = line.split("\\s+");
           String key = lineSplit[0];
           float value = Float.parseFloat(lineSplit[1]);
-          MAPVALUE.set(value);
+          MAPVALUE.set(value/total);
           keyToProb.put(key, MAPVALUE);
           line = br.readLine();
         }
@@ -278,7 +282,11 @@ public class StripesPMI extends Configured implements Tool {
     long startTime = System.currentTimeMillis();
     job.waitForCompletion(true);
 
+    Counters counters = job.getCounters();
+    long count = counters.findCounter("org.apache.hadoop.mapred.Task$Counter", "MAP_INPUT_RECORDS").getValue();
+
     Configuration conf2 = getConf();
+    conf2.set("Total",String.valueOf(count));
     Job job2 = Job.getInstance(conf2);
     job2.setJobName(StripesPMI.class.getSimpleName());
     job2.setJarByClass(StripesPMI.class);
