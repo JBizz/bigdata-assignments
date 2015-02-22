@@ -128,11 +128,11 @@ public class StripesPMI extends Configured implements Tool {
       for (String mapkey : mapkeys){
         sum = sum + adder.get(mapkey);
       }
-      COUNT.set(sum);
 
-      float countHold = COUNT.get();
+
+      float countHold = sum;
       //float totalHold = TOTAL.get();
-      SINGLEPROB.set((countHold));
+      SINGLEPROB.set(countHold);
 
       context.write(key, SINGLEPROB);
     }
@@ -155,7 +155,7 @@ public class StripesPMI extends Configured implements Tool {
       TOTAL.set(total);
 
       FileSystem fs = FileSystem.get(context.getConfiguration());
-      FileStatus[] status_list = fs.listStatus(new Path("tempFile"));
+      FileStatus[] status_list = fs.listStatus(new Path("user/hdedu1/tempFile"));
       for(FileStatus status : status_list){
         BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(status.getPath())));
         String line = br.readLine();
@@ -244,13 +244,14 @@ public class StripesPMI extends Configured implements Tool {
       ToolRunner.printGenericCommandUsage(System.out);
       return -1;
     }
-
+    //MY HDFS DIRECTORY
+    String myDirectory = "user/hdedu1/";
     String inputPath = cmdline.getOptionValue(INPUT);
-    String outputPath = cmdline.getOptionValue(OUTPUT);
+    String outputPath = myDirectory + cmdline.getOptionValue(OUTPUT);
     int reduceTasks = cmdline.hasOption(NUM_REDUCERS) ?
         Integer.parseInt(cmdline.getOptionValue(NUM_REDUCERS)) : 1;
 
-    String tempOut = "tempFile";
+    String tempOut = myDirectory + "tempFile";
 
     LOG.info("Tool: " + StripesPMI.class.getSimpleName());
     LOG.info(" - input path: " + inputPath);

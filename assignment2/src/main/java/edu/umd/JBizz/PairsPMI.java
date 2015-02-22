@@ -56,7 +56,7 @@ public class PairsPMI extends Configured implements Tool {
   
     // Reuse objects to save overhead of object creation.
     private final static IntWritable ONE = new IntWritable(1);
-    private final static PairOfStrings MARGE = new PairOfStrings();
+    //private final static PairOfStrings MARGE = new PairOfStrings();
     private static final PairOfStrings PAIR = new PairOfStrings();
 
     @Override
@@ -128,27 +128,16 @@ public class PairsPMI extends Configured implements Tool {
     @Override
     public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
         throws IOException, InterruptedException {
-      //Configuration conf = context.getConfiguration();
-      //float total = conf.get(COUNTERS.TOTAL).floatValue();
-      // Sum up values.
+
       Iterator<IntWritable> iter = values.iterator();
       int sum = 0;
-      //int margeSum = 0;
       while (iter.hasNext()) {
         sum += iter.next().get();
       }
       if(key.getValue().equals("!")){
-          //MARGESUM.set(sum);
           float countHolder = sum;
-          //float total = TOTAL.get();
-          //float total = context.getCounter().findCounter(COUNTERS.TOTAL).getValue().floatValue();
-          //float totalHolder = TOTAL.get();
-          //LOG.info(totalHolder);
-
           PMI.set(countHolder);
           Text textKey = new Text(key.getLeftElement());
-          //LOG.info(textKey);
-          //LOG.info(PMI);
           context.write(textKey, PMI); 
       }
     }
@@ -166,26 +155,19 @@ public class PairsPMI extends Configured implements Tool {
     public void setup(Context context) throws IOException {
 
       FileSystem fs = FileSystem.get(context.getConfiguration());
-      //File path = new File("tempFile");
       long total = Long.valueOf(context.getConfiguration().get("Total"));
       TOTAL.set(Float.valueOf(total));
       LOG.info(TOTAL);
-      FileStatus[] status_list = fs.listStatus(new Path("tempFile"));
+      FileStatus[] status_list = fs.listStatus(new Path("user/hdedu1/tempFile"));
       for(FileStatus status : status_list){
         BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(status.getPath())));
         String line = br.readLine();
         while(line != null){
           String[] lineSplit = line.split("\\s+");
-          //LOG.info(lineSplit);
           String key = lineSplit[0];
-          //LOG.info(lineSplit[1]);
           float value = Float.parseFloat(lineSplit[1]);
-          //LOG.info(value);
           MAPVALUE.set(value);
-          //LOG.info(MAPVALUE);
           keyToProb.put(key, MAPVALUE);
-          //LOG.info(key);
-          //LOG.info(MAPVALUE);
           line = br.readLine();
         }
         br.close();
@@ -196,42 +178,22 @@ public class PairsPMI extends Configured implements Tool {
     @Override
     public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
         throws IOException, InterruptedException {
-      // Sum up values.
-      //Configuration conf = context.getConfiguration();
-      //Counter counter = context.getCounter
-      //float total = conf.get(COUNTERS.TOTAL).floatValue();
+
       Iterator<IntWritable> iter = values.iterator();
       int sum = 0;
       int margeSum = 0;
       while (iter.hasNext()) {
         sum += iter.next().get();
       }
-      //if(key.getValue().equals("!")){
-          //float pmiHolder = keyToProb.get(key.getLeftElement()).get();
-          //PMI.set(keyToProb.get(key.getLeftElement()).get());
-          //context.write(key, PMI);
-      //}
+
       if(!key.getValue().equals("!")){
         float sumFloat = sum;
         float total = TOTAL.get();
-        //LOG.info(key);
-        //LOG.info(TOTAL);
-        //LOG.info(total);
-        //LOG.info(key.getLeftElement());
-        //LOG.info(keyToProb.get(key.getLeftElement()).get());
-        //LOG.info(key.getRightElement());
-        //LOG.info(keyToProb.get(key.getRightElement()).get());
-        //LOG.info(keyToProb.get(key.getLeftElement()).get());
-        //LOG.info(keyToProb.get(key.getRightElement()).get());
-        //float total = context.getCounter().findCounter(COUNTERS.TOTAL).getValue().floatValue();
         float pairProb = sumFloat / total;
-        //float margeFLoat = MARGESUM.get();
         String left = key.getLeftElement();
         String right = key.getRightElement();
         float leftString = keyToProb.get(left).get() / total;
         float rightString = keyToProb.get(right).get() / total;
-        //float leftString = (keyToProb.get(key.getLeftElement()).get()) / total;
-        //float rightString = (keyToProb.get(key.getRightElement()).get()) / total;
         float pmi = (float)Math.log10(pairProb/(leftString*rightString));
         PMI.set(pmi);
         context.write(key, PMI);
@@ -286,13 +248,14 @@ public class PairsPMI extends Configured implements Tool {
       ToolRunner.printGenericCommandUsage(System.out);
       return -1;
     }
-
+    //MY HDFS DIRECTORY
+    String myDirectory = "user/hdedu1/";
     String inputPath = cmdline.getOptionValue(INPUT);
-    String outputPath = cmdline.getOptionValue(OUTPUT);
+    String outputPath = myDirectory + cmdline.getOptionValue(OUTPUT);
     int reduceTasks = cmdline.hasOption(NUM_REDUCERS) ?
         Integer.parseInt(cmdline.getOptionValue(NUM_REDUCERS)) : 1;
 
-    String tempOut = "tempFile";
+    String tempOut = myDirectory + "tempFile";
 
     LOG.info("Tool: " + PairsPMI.class.getSimpleName());
     LOG.info(" - input path: " + inputPath);
