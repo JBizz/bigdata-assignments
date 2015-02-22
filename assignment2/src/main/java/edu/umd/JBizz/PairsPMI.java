@@ -33,8 +33,10 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Partitioner;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.task.*;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.io.WritableComparable;
@@ -48,11 +50,10 @@ import tl.lin.data.pair.PairOfStrings;
 public class PairsPMI extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(PairsPMI.class);
   private final static IntWritable TOTAL = new IntWritable(0);
+
   private static class MyMapper extends Mapper<LongWritable, Text, PairOfStrings, IntWritable> {
 
-  public static enum COUNTERS {
-    TOTAL
-  }
+  
     // Reuse objects to save overhead of object creation.
     private final static IntWritable ONE = new IntWritable(1);
     private final static PairOfStrings MARGE = new PairOfStrings();
@@ -87,8 +88,7 @@ public class PairsPMI extends Configured implements Tool {
             //no double reporting a single line coocurrence
             if(Arrays.asList(usedTerms).contains(terms[j]))
               continue;
-            context.getCounter(COUNTERS.TOTAL).increment(1);
-            //TOTAL.set(TOTAL.get() + 1);
+          
             PAIR.set(term, terms[j]);
             context.write(PAIR, ONE);
             PAIR.set(term, marge);
@@ -103,6 +103,7 @@ public class PairsPMI extends Configured implements Tool {
 
   private static class MyCombiner extends Reducer<PairOfStrings, IntWritable, PairOfStrings, IntWritable>{
     private final static IntWritable COUNT = new IntWritable();
+    private final static FloatWritable PMI = new FloatWritable();
 
     @Override
     public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context) 
@@ -121,27 +122,29 @@ public class PairsPMI extends Configured implements Tool {
   private static class MyReducer extends Reducer<PairOfStrings, IntWritable, Text, FloatWritable> {
 
     // Reuse objects.
-    private final static IntWritable SUM = new IntWritable();
-    private final static IntWritable MARGESUM = new IntWritable();
     private final static FloatWritable PMI = new FloatWritable();
+    private final static FloatWritable SUM = new FloatWritable();
 
     @Override
     public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
         throws IOException, InterruptedException {
+      //Configuration conf = context.getConfiguration();
+      //float total = conf.get(COUNTERS.TOTAL).floatValue();
       // Sum up values.
       Iterator<IntWritable> iter = values.iterator();
       int sum = 0;
-      int margeSum = 0;
+      //int margeSum = 0;
       while (iter.hasNext()) {
         sum += iter.next().get();
       }
       if(key.getValue().equals("!")){
-          MARGESUM.set(sum);
+          //MARGESUM.set(sum);
           float countHolder = sum;
-          float total = job.getCounters().findCounter(COUNTERS.TOTAL).getValue().floatValue();
+          //float total = TOTAL.get();
+          //float total = context.getCounter().findCounter(COUNTERS.TOTAL).getValue().floatValue();
           //float totalHolder = TOTAL.get();
           //LOG.info(totalHolder);
-          PMI.set((float) countHolder/total);
+          PMI.set(countHolder);
           Text textKey = new Text(key.getLeftElement());
           context.write(textKey, PMI); 
       }
@@ -153,6 +156,7 @@ public class PairsPMI extends Configured implements Tool {
     private final static IntWritable MARGESUM = new IntWritable();
     private final static FloatWritable PMI = new FloatWritable();
     private static final FloatWritable MAPVALUE = new FloatWritable();
+    private static final FloatWritable TOTAL = new FloatWritable();
     private final static HashMap<String, FloatWritable> keyToProb = new HashMap<String, FloatWritable>();
 
     @Override
@@ -160,6 +164,9 @@ public class PairsPMI extends Configured implements Tool {
 
       FileSystem fs = FileSystem.get(context.getConfiguration());
       //File path = new File("tempFile");
+      long total = Long.valueOf(context.getConfiguration().get("Total"));
+      TOTAL.set(Float.valueOf(total));
+      LOG.info(TOTAL);
       FileStatus[] status_list = fs.listStatus(new Path("tempFile"));
       for(FileStatus status : status_list){
         BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(status.getPath())));
@@ -176,10 +183,14 @@ public class PairsPMI extends Configured implements Tool {
       }
     }
 
+
     @Override
     public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
         throws IOException, InterruptedException {
       // Sum up values.
+      //Configuration conf = context.getConfiguration();
+      //Counter counter = context.getCounter
+      //float total = conf.get(COUNTERS.TOTAL).floatValue();
       Iterator<IntWritable> iter = values.iterator();
       int sum = 0;
       int margeSum = 0;
@@ -193,11 +204,12 @@ public class PairsPMI extends Configured implements Tool {
       }
       if(!key.getValue().equals("!")){
         float sumFloat = sum;
-        float total = job.getCounters().findCounter(COUNTERS.TOTAL).getValue().floatValue();
+        float total = TOTAL.get();
+        //float total = context.getCounter().findCounter(COUNTERS.TOTAL).getValue().floatValue();
         float pairProb = sumFloat / total;
         //float margeFLoat = MARGESUM.get();
-        float leftString = keyToProb.get(key.getLeftElement()).get();
-        float rightString = keyToProb.get(key.getRightElement()).get();
+        float leftString = (keyToProb.get(key.getLeftElement()).get()) / total;
+        float rightString = (keyToProb.get(key.getRightElement()).get()) / total;
         float pmi = (float)Math.log10(pairProb/(leftString*rightString));
         PMI.set(pmi);
         context.write(key, PMI);
@@ -265,6 +277,7 @@ public class PairsPMI extends Configured implements Tool {
     LOG.info(" - output path: " + outputPath);
 
     Configuration conf = getConf();
+    //conf.set("Total", "0");
     Job job = Job.getInstance(conf);
     job.setJobName(PairsPMI.class.getSimpleName());
     job.setJarByClass(PairsPMI.class);
@@ -292,10 +305,14 @@ public class PairsPMI extends Configured implements Tool {
 
     long startTime = System.currentTimeMillis();
     job.waitForCompletion(true);
+
+    Counters counters = job.getCounters();
+    long count = counters.findCounter("org.apache.hadoop.mapred.Task$Counter", "MAP_INPUT_RECORDS").getValue();
     //run second here
 
 
     Configuration conf2 = getConf();
+    conf2.set("Total",String.valueOf(count));
     Job job2 = Job.getInstance(conf2);
     job2.setJobName(PairsPMI.class.getSimpleName());
     job2.setJarByClass(PairsPMI.class);
