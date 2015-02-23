@@ -303,7 +303,7 @@ public class StripesPMI extends Configured implements Tool {
     job2.setOutputValueClass(HMapStFW.class);
 
     job2.setMapperClass(MyMapper.class);
-    job2.setCombinerClass(MyCombiner.class);
+    //job2.setCombinerClass(MyCombiner.class);
     job2.setReducerClass(MyReducer2.class);
 
     // Delete the output directory if it exists already.
