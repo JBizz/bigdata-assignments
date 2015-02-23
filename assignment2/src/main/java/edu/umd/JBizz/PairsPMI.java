@@ -158,7 +158,7 @@ public class PairsPMI extends Configured implements Tool {
       long total = Long.valueOf(context.getConfiguration().get("Total"));
       TOTAL.set(Float.valueOf(total));
       LOG.info(TOTAL);
-      FileStatus[] status_list = fs.listStatus(new Path("user/hdedu1/tempFile"));
+      FileStatus[] status_list = fs.listStatus(new Path("tempFile"));
       for(FileStatus status : status_list){
         BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(status.getPath())));
         String line = br.readLine();
@@ -249,13 +249,13 @@ public class PairsPMI extends Configured implements Tool {
       return -1;
     }
     //MY HDFS DIRECTORY
-    String myDirectory = "user/hdedu1/";
+
     String inputPath = cmdline.getOptionValue(INPUT);
-    String outputPath = myDirectory + cmdline.getOptionValue(OUTPUT);
+    String outputPath = cmdline.getOptionValue(OUTPUT);
     int reduceTasks = cmdline.hasOption(NUM_REDUCERS) ?
         Integer.parseInt(cmdline.getOptionValue(NUM_REDUCERS)) : 1;
 
-    String tempOut = myDirectory + "tempFile";
+    String tempOut = "tempFile";
 
     LOG.info("Tool: " + PairsPMI.class.getSimpleName());
     LOG.info(" - input path: " + inputPath);
@@ -281,7 +281,7 @@ public class PairsPMI extends Configured implements Tool {
 
     job.setMapperClass(MyMapper.class);
     job.setPartitionerClass(MyPartitioner .class);
-    job.setCombinerClass(MyCombiner.class);
+    //job.setCombinerClass(MyCombiner.class);
     job.setReducerClass(MyReducer.class);
 
     // Delete the output directory if it exists already.

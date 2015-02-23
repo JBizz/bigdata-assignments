@@ -273,7 +273,7 @@ public class StripesPMI extends Configured implements Tool {
     job.setOutputValueClass(FloatWritable.class);
 
     job.setMapperClass(MyMapper.class);
-    job.setCombinerClass(MyCombiner.class);
+    //job.setCombinerClass(MyCombiner.class);
     job.setReducerClass(MyReducer.class);
 
     // Delete the output directory if it exists already.
