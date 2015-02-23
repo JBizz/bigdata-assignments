@@ -186,16 +186,18 @@ public class StripesPMI extends Configured implements Tool {
           //adder.plus(value);
         //}
         Set<String> mapkeys = adder.keySet();
-        int sum = 0;
+        //int sum = 0;
         for (String mapkey : mapkeys){
-          float countHold = adder.get(mapkey);
-          float totalHold = TOTAL.get();
-          float pairProb = countHold/totalHold;
-          //LOG.info(key.toString());
-          float leftString = keyToProb.get(key.toString()).get();
-          float rightString = keyToProb.get(mapkey).get();
-          float pmi = (float) Math.log10(pairProb/(leftString*rightString));
-          pmiMap.put(mapkey, pmi);
+          if (adder.get(mapkey) >= 10){
+            float countHold = adder.get(mapkey);
+            float totalHold = TOTAL.get();
+            float pairProb = countHold/totalHold;
+            //LOG.info(key.toString());
+            float leftString = keyToProb.get(key.toString()).get();
+            float rightString = keyToProb.get(mapkey).get();
+            float pmi = (float) Math.log10(pairProb/(leftString*rightString));
+            pmiMap.put(mapkey, pmi);
+          }
         }
 
         context.write(key, pmiMap);
@@ -273,7 +275,7 @@ public class StripesPMI extends Configured implements Tool {
     job.setOutputValueClass(FloatWritable.class);
 
     job.setMapperClass(MyMapper.class);
-    //job.setCombinerClass(MyCombiner.class);
+    job.setCombinerClass(MyCombiner.class);
     job.setReducerClass(MyReducer.class);
 
     // Delete the output directory if it exists already.
@@ -303,7 +305,7 @@ public class StripesPMI extends Configured implements Tool {
     job2.setOutputValueClass(HMapStFW.class);
 
     job2.setMapperClass(MyMapper.class);
-    //job2.setCombinerClass(MyCombiner.class);
+    job2.setCombinerClass(MyCombiner.class);
     job2.setReducerClass(MyReducer2.class);
 
     // Delete the output directory if it exists already.

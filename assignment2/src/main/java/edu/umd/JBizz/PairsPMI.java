@@ -185,19 +185,20 @@ public class PairsPMI extends Configured implements Tool {
       while (iter.hasNext()) {
         sum += iter.next().get();
       }
-
-      if(!key.getValue().equals("!")){
-        float sumFloat = sum;
-        float total = TOTAL.get();
-        float pairProb = sumFloat / total;
-        String left = key.getLeftElement();
-        String right = key.getRightElement();
-        float leftString = keyToProb.get(left).get() / total;
-        float rightString = keyToProb.get(right).get() / total;
-        float pmi = (float)Math.log10(pairProb/(leftString*rightString));
-        PMI.set(pmi);
-        context.write(key, PMI);
-      }
+      if (sum >= 10){
+        if(!key.getValue().equals("!")){
+          float sumFloat = sum;
+          float total = TOTAL.get();
+          float pairProb = sumFloat / total;
+          String left = key.getLeftElement();
+          String right = key.getRightElement();
+          float leftString = keyToProb.get(left).get() / total;
+          float rightString = keyToProb.get(right).get() / total;
+          float pmi = (float)Math.log10(pairProb/(leftString*rightString));
+          PMI.set(pmi);
+          context.write(key, PMI);
+        }
+      } 
     }
   }
 
