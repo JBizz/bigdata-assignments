@@ -187,6 +187,7 @@ public class StripesPMI extends Configured implements Tool {
         //}
         Set<String> mapkeys = adder.keySet();
         //int sum = 0;
+
         for (String mapkey : mapkeys){
           if (adder.get(mapkey) >= 10){
             float countHold = adder.get(mapkey);
@@ -199,8 +200,9 @@ public class StripesPMI extends Configured implements Tool {
             pmiMap.put(mapkey, pmi);
           }
         }
-
-        context.write(key, pmiMap);
+        if(pmiMap.size() > 0){
+          context.write(key, pmiMap);
+        }
       }
     }
 
