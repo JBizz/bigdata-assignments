@@ -281,7 +281,7 @@ public class PairsPMI extends Configured implements Tool {
 
     job.setMapperClass(MyMapper.class);
     job.setPartitionerClass(MyPartitioner .class);
-    //job.setCombinerClass(MyCombiner.class);
+    job.setCombinerClass(MyCombiner.class);
     job.setReducerClass(MyReducer.class);
 
     // Delete the output directory if it exists already.
@@ -314,7 +314,7 @@ public class PairsPMI extends Configured implements Tool {
 
     job2.setMapperClass(MyMapper.class);
     job2.setPartitionerClass(MyPartitioner .class);
-    //job2.setCombinerClass(MyCombiner.class);
+    job2.setCombinerClass(MyCombiner.class);
     job2.setReducerClass(MyReducer2.class);
 
     // Delete the output directory if it exists already.
