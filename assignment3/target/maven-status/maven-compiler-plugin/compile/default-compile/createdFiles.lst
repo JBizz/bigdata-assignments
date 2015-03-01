@@ -3,3 +3,4 @@ edu/umd/JBizz/BooleanRetrievalCompressed.class
 edu/umd/JBizz/BuildInvertedIndexCompressed$MyMapper.class
 edu/umd/JBizz/LookupPostings.class
 edu/umd/JBizz/BuildInvertedIndexCompressed.class
+edu/umd/JBizz/BuildInvertedIndexCompressed$MyPartitioner.class
