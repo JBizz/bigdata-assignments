@@ -65,10 +65,7 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(BuildInvertedIndexCompressed.class);
 
   private static class MyMapper extends Mapper<LongWritable, Text, PairOfStringInt, VIntWritable> {
-    //private static final Text WORD = new Text();
     private static final PairOfStringInt COMPKEY = new PairOfStringInt();
-    //private static final IntWritable COUNT = new IntWritable();
-    //private static final PairOfInts POST = new PairOfInts();
     private static final Object2IntFrequencyDistribution<String> COUNTS =
         new Object2IntFrequencyDistributionEntry<String>();
 
@@ -76,7 +73,7 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     public void map(LongWritable docno, Text doc, Context context)
         throws IOException, InterruptedException {
       String text = doc.toString();
-      //COUNTS.clear();
+      COUNTS.clear();
 
       String[] terms = text.split("\\s+");
 
@@ -91,15 +88,8 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
 
       // Emit postings.
       for (PairOfObjectInt<String> e : COUNTS) {
-        //WORD.set(e.getLeftElement());
         COMPKEY.set(e.getLeftElement(), (int) docno.get());
-        //COUNT.set(e.getRightElement());
-        //POST.set((int) docno.get(), e.getRightElement());
-        //context.write(WORD, new PairOfInts((int) docno.get(), e.getRightElement()));
         context.write(COMPKEY, new VIntWritable(e.getRightElement()));
-
-        //COMPKEY.set(e.getLeftElement(), 0);
-        //context.write(COMPKEY, new VIntWritable(e.getRightElement());
       }
     }
   }
