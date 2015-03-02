@@ -89,6 +89,7 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
       // Emit postings.
       for (PairOfObjectInt<String> e : COUNTS) {
         COMPKEY.set(e.getLeftElement(), (int) docno.get());
+        //System.out.println(COMPKEY);
         context.write(COMPKEY, new VIntWritable(e.getRightElement()));
       }
     }
@@ -96,39 +97,51 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
 
   private static class MyReducer extends
       Reducer<PairOfStringInt, VIntWritable, Text, BytesWritable> {
-    //private final static IntWritable DF = new IntWritable();
 
+      private final static ArrayListWritable<PairOfInts> POSTINGS = new ArrayListWritable<PairOfInts>();
+      private final static Text PREV = new Text();
     @Override
     public void reduce(PairOfStringInt key, Iterable<VIntWritable> values, Context context)
         throws IOException, InterruptedException {
-          //int df = 0;
-          //if(key.getRightElement()  == 0){
-            //df++;
-            //DF.set(df);
-          //}else{
-            Iterator<VIntWritable> iter = values.iterator();
-            ArrayListWritable<PairOfInts> postings = new ArrayListWritable<PairOfInts>();
-            while(iter.hasNext()){
-              postings.add(new PairOfInts(key.getRightElement(), iter.next().get()));
-            }
 
+          Iterator<VIntWritable> iter = values.iterator();
+
+          if (PREV.getLength() == 0 || PREV.toString() == null){
+            PREV.set(key.getLeftElement());
+          }
+          
+          if(key.getLeftElement().equals(PREV.toString())) {   
+            while(iter.hasNext()){
+              POSTINGS.add(new PairOfInts(key.getRightElement(), iter.next().get()));
+            }
+            PREV.set(key.getLeftElement());
+          }else{
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream oos = new DataOutputStream(baos);
-            //DataOutput dot = new DataOutput(oos);
-            //WritableUtils.writeVInt(oos, DF.get());
-            for (PairOfInts poi : postings){
-              WritableUtils.writeVInt(oos, poi.getRightElement());
+            //System.out.println(key.getLeftElement());
+            for (PairOfInts poi : POSTINGS){
+              //System.out.println(poi);
               WritableUtils.writeVInt(oos, poi.getLeftElement());
+              WritableUtils.writeVInt(oos, poi.getRightElement());
             }
+            //System.out.println(POSTINGS);
             byte[] posterino = baos.toByteArray();
             BytesWritable out = new BytesWritable(posterino);
             Text keyOut = new Text();
+
             keyOut.set(key.getLeftElement());
             context.write(keyOut, out);
-          }
-        //new PairOfWritables<VIntWritable, byte[]>(new VIntwritable(DF.get()), posterino));
-    }
-  //}
+            oos.close();
+
+            POSTINGS.clear();
+            PREV.set(key.getLeftElement());
+            while(iter.hasNext()){
+              POSTINGS.add(new PairOfInts(key.getRightElement(), iter.next().get()));
+            }
+          }  
+        }
+      }  
+  
 
   public static class MyPartitioner extends Partitioner<PairOfStringInt, VIntWritable>{
     @Override
