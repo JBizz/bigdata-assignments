@@ -64,11 +64,11 @@ import tl.lin.data.pair.PairOfWritables;
 public class BuildInvertedIndexCompressed extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(BuildInvertedIndexCompressed.class);
 
-  private static class MyMapper extends Mapper<LongWritable, Text, PairOfStringInt, PairOfInts> {
+  private static class MyMapper extends Mapper<LongWritable, Text, PairOfStringInt, VIntWritable> {
     //private static final Text WORD = new Text();
     private static final PairOfStringInt COMPKEY = new PairOfStringInt();
     //private static final IntWritable COUNT = new IntWritable();
-    private static final PairOfInts POST = new PairOfInts();
+    //private static final PairOfInts POST = new PairOfInts();
     private static final Object2IntFrequencyDistribution<String> COUNTS =
         new Object2IntFrequencyDistributionEntry<String>();
 
@@ -94,38 +94,38 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
         //WORD.set(e.getLeftElement());
         COMPKEY.set(e.getLeftElement(), (int) docno.get());
         //COUNT.set(e.getRightElement());
-        POST.set((int) docno.get(), e.getRightElement());
+        //POST.set((int) docno.get(), e.getRightElement());
         //context.write(WORD, new PairOfInts((int) docno.get(), e.getRightElement()));
-        context.write(COMPKEY, POST);
+        context.write(COMPKEY, new VIntWritable(e.getRightElement()));
 
-        COMPKEY.set(e.getLeftElement(), 0);
-        context.write(COMPKEY, POST);
+        //COMPKEY.set(e.getLeftElement(), 0);
+        //context.write(COMPKEY, new VIntWritable(e.getRightElement());
       }
     }
   }
 
   private static class MyReducer extends
-      Reducer<PairOfStringInt, PairOfInts, Text, BytesWritable> {
-    private final static IntWritable DF = new IntWritable();
+      Reducer<PairOfStringInt, VIntWritable, Text, BytesWritable> {
+    //private final static IntWritable DF = new IntWritable();
 
     @Override
-    public void reduce(PairOfStringInt key, Iterable<PairOfInts> values, Context context)
+    public void reduce(PairOfStringInt key, Iterable<VIntWritable> values, Context context)
         throws IOException, InterruptedException {
-          int df = 0;
-          if(key.getRightElement()  == 0){
-            df++;
-            DF.set(df);
-          }else{
-            Iterator<PairOfInts> iter = values.iterator();
+          //int df = 0;
+          //if(key.getRightElement()  == 0){
+            //df++;
+            //DF.set(df);
+          //}else{
+            Iterator<VIntWritable> iter = values.iterator();
             ArrayListWritable<PairOfInts> postings = new ArrayListWritable<PairOfInts>();
             while(iter.hasNext()){
-              postings.add(iter.next().clone());
+              postings.add(new PairOfInts(key.getRightElement(), iter.next().get()));
             }
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream oos = new DataOutputStream(baos);
             //DataOutput dot = new DataOutput(oos);
-            WritableUtils.writeVInt(oos, DF.get());
+            //WritableUtils.writeVInt(oos, DF.get());
             for (PairOfInts poi : postings){
               WritableUtils.writeVInt(oos, poi.getRightElement());
               WritableUtils.writeVInt(oos, poi.getLeftElement());
@@ -138,11 +138,11 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
           }
         //new PairOfWritables<VIntWritable, byte[]>(new VIntwritable(DF.get()), posterino));
     }
-  }
+  //}
 
-  public static class MyPartitioner extends Partitioner<PairOfStringInt, PairOfInts>{
+  public static class MyPartitioner extends Partitioner<PairOfStringInt, VIntWritable>{
     @Override
-    public int getPartition(PairOfStringInt key, PairOfInts value, int numReduceTasks){
+    public int getPartition(PairOfStringInt key, VIntWritable value, int numReduceTasks){
       return (key.getLeftElement().hashCode() & Integer.MAX_VALUE) % numReduceTasks;
     }
   }
@@ -208,7 +208,7 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     //job.setMapOutputKeyClass(Text.class);
     //job.setMapOutputValueClass(PairOfInts.class);
     job.setMapOutputKeyClass(PairOfStringInt.class);
-    job.setMapOutputValueClass(PairOfInts.class);
+    job.setMapOutputValueClass(VIntWritable.class);
     job.setOutputKeyClass(Text.class);
     job.setOutputValueClass(PairOfWritables.class);
     job.setOutputFormatClass(MapFileOutputFormat.class);
