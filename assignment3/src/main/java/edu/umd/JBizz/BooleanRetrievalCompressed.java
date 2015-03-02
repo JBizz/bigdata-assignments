@@ -19,6 +19,9 @@ package edu.umd.JBizz;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.DataInputStream;
+import java.io.InputStream;
+import java.io.ByteArrayInputStream;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.Stack;
@@ -39,6 +42,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -128,13 +133,28 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
 
   private ArrayListWritable<PairOfInts> fetchPostings(String term) throws IOException {
     Text key = new Text();
-    PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>> value =
-        new PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>>();
-
+    //PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>> value =
+        //new PairOfWritables<IntWritable, ArrayListWritable<PairOfInts>>();
+    ArrayListWritable<PairOfInts> poi = new ArrayListWritable<PairOfInts>();
+    BytesWritable value = new BytesWritable();
+    PairOfInts pair = new PairOfInts();
     key.set(term);
     index.get(key, value);
 
-    return value.getRightElement();
+    byte[] vals = value.getBytes();
+
+    DataInputStream dis = new DataInputStream(new ByteArrayInputStream(vals));
+    int available = dis.available();
+    int j = 0;
+    int i = 0;
+    while(available > 0){
+      j = WritableUtils.readVInt(dis);
+      i = WritableUtils.readVInt(dis);
+      pair.set(j,i);
+      poi.add(pair);
+      available = dis.available();
+    }
+    return poi;
   }
 
   private String fetchLine(long offset) throws IOException {
