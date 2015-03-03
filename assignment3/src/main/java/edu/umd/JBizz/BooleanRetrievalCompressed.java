@@ -76,11 +76,11 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
         pushTerm(t);
       }
     }
-    System.out.println(stack);
     Set<Integer> set = stack.pop();
 
     for (Integer i : set) {
       String line = fetchLine(i);
+      line = line.substring(0, Math.min(line.length(), 80));
       System.out.println(i + "\t" + line);
     }
   }
@@ -127,7 +127,6 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
     for (PairOfInts pair : fetchPostings(term)) {
       set.add(pair.getLeftElement());
     }
-    System.out.println(set);
     return set;
   }
 
@@ -140,9 +139,7 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
     PairOfInts pair = new PairOfInts();
     key.set(term);
     index.get(key, value);
-    //System.out.println(value);
     byte[] vals = value.getBytes();
-    //System.out.println(vals);
     DataInputStream dis = new DataInputStream(new ByteArrayInputStream(vals));
     int j = 0;
     int i = 0;
@@ -157,9 +154,6 @@ public class BooleanRetrievalCompressed extends Configured implements Tool {
         poi.add(new PairOfInts(j,i));
       }   
     }
-    //dis.close();
-    //System.out.println(term);
-    //System.out.println(poi);
     return poi;
   }
 

@@ -89,7 +89,6 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
       // Emit postings.
       for (PairOfObjectInt<String> e : COUNTS) {
         COMPKEY.set(e.getLeftElement(), (int) docno.get());
-        //System.out.println(COMPKEY);
         context.write(COMPKEY, new VIntWritable(e.getRightElement()));
       }
     }
@@ -103,7 +102,6 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
     @Override
     public void reduce(PairOfStringInt key, Iterable<VIntWritable> values, Context context)
         throws IOException, InterruptedException {
-
           Iterator<VIntWritable> iter = values.iterator();
 
           if (PREV.getLength() == 0 || PREV.toString() == null){
@@ -118,18 +116,15 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
           }else{
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream oos = new DataOutputStream(baos);
-            //System.out.println(key.getLeftElement());
+
             for (PairOfInts poi : POSTINGS){
-              //System.out.println(poi);
               WritableUtils.writeVInt(oos, poi.getLeftElement());
               WritableUtils.writeVInt(oos, poi.getRightElement());
             }
-            //System.out.println(POSTINGS);
             byte[] posterino = baos.toByteArray();
             BytesWritable out = new BytesWritable(posterino);
             Text keyOut = new Text();
-
-            keyOut.set(key.getLeftElement());
+            keyOut.set(PREV);
             context.write(keyOut, out);
             oos.close();
 
