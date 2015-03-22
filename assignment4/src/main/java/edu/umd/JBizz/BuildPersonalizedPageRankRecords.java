@@ -85,14 +85,18 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
 
       int source = context.getConfiguration().getInt(SOURCE, 0);
 
+      //LOG.info("SOURCE VALUE!!!!!!!!!!!!!!!! " + source);
+
       int[] sourceNodes = context.getConfiguration().getInts(SOURCE_NODES);
           
       String[] arr = t.toString().trim().split("\\s+");
 
       nid.set(Integer.parseInt(arr[0]));
+      //LOG.info("NID VALUE !!!!!!!!!!!!!!!!!! " + nid.get());
       //Set page rank to 1 for source nodes and 0 for non-source nodes
       if(nid.get() == source){
         node.setPageRank(1);
+        //LOG.info("FOUND NODE SOURCE: " + nid.get() + " matching the first entered node id for source: " + source);
       }else{
         node.setPageRank(0);
       }
