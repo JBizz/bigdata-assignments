@@ -54,10 +54,14 @@ import tl.lin.data.array.ArrayListOfIntsWritable;
  * @author Jimmy Lin
  * @author Michael Schatz
  */
+
 public class BuildPersonalizedPageRankRecords extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(BuildPersonalizedPageRankRecords.class);
 
   private static final String NODE_CNT_FIELD = "node.cnt";
+  private static final String SOURCE = "source.node";
+  private static final String SOURCE_NODES = "source.nodes";
+
 
   private static class MyMapper extends Mapper<LongWritable, Text, IntWritable, PageRankNode> {
     private static final IntWritable nid = new IntWritable();
@@ -69,16 +73,30 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
       if (n == 0) {
         throw new RuntimeException(NODE_CNT_FIELD + " cannot be 0!");
       }
+      
+      //LOG.info("source node: " + source);
       node.setType(PageRankNode.Type.Complete);
-      node.setPageRank((float) -StrictMath.log(n));
+      //node.setPageRank((float) -StrictMath.log(n));
     }
 
     @Override
     public void map(LongWritable key, Text t, Context context) throws IOException,
         InterruptedException {
+
+      int source = context.getConfiguration().getInt(SOURCE, 0);
+
+      int[] sourceNodes = context.getConfiguration().getInts(SOURCE_NODES);
+          
       String[] arr = t.toString().trim().split("\\s+");
 
       nid.set(Integer.parseInt(arr[0]));
+      //Set page rank to 1 for source nodes and 0 for non-source nodes
+      if(nid.get() == source){
+        node.setPageRank(1);
+      }else{
+        node.setPageRank(0);
+      }
+
       if (arr.length == 1) {
         node.setNodeId(Integer.parseInt(arr[0]));
         node.setAdjacencyList(new ArrayListOfIntsWritable());
@@ -110,6 +128,8 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
   private static final String INPUT = "input";
   private static final String OUTPUT = "output";
   private static final String NUM_NODES = "numNodes";
+  private static final String SOURCES = "sources";
+  private static final String NUM_SOURCES = "numSources";
 
   /**
    * Runs this tool.
@@ -124,6 +144,8 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
         .withDescription("output path").create(OUTPUT));
     options.addOption(OptionBuilder.withArgName("num").hasArg()
         .withDescription("number of nodes").create(NUM_NODES));
+    options.addOption(OptionBuilder.withArgName("sources").hasArg()
+        .withDescription("Personalization Nodes").create(SOURCES));
 
     CommandLine cmdline;
     CommandLineParser parser = new GnuParser();
@@ -135,7 +157,7 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
       return -1;
     }
 
-    if (!cmdline.hasOption(INPUT) || !cmdline.hasOption(OUTPUT) || !cmdline.hasOption(NUM_NODES)) {
+    if (!cmdline.hasOption(INPUT) || !cmdline.hasOption(OUTPUT) || !cmdline.hasOption(NUM_NODES) || !cmdline.hasOption(SOURCES)) {
       System.out.println("args: " + Arrays.toString(args));
       HelpFormatter formatter = new HelpFormatter();
       formatter.setWidth(120);
@@ -147,15 +169,32 @@ public class BuildPersonalizedPageRankRecords extends Configured implements Tool
     String inputPath = cmdline.getOptionValue(INPUT);
     String outputPath = cmdline.getOptionValue(OUTPUT);
     int n = Integer.parseInt(cmdline.getOptionValue(NUM_NODES));
+    String sources = cmdline.getOptionValue(SOURCES);
+
+    String[] sourceList = sources.trim().split(",");
+    int numSources = sourceList.length;
+
+    int source = Integer.parseInt(sourceList[0]);
+
+    int[] sourceNodes = new int[numSources];
+    for (int i=0; i <numSources; i++)
+    {
+      sourceNodes[i] = Integer.parseInt(sourceList[i]);
+    }
 
     LOG.info("Tool name: " + BuildPersonalizedPageRankRecords.class.getSimpleName());
     LOG.info(" - inputDir: " + inputPath);
     LOG.info(" - outputDir: " + outputPath);
     LOG.info(" - numNodes: " + n);
+    LOG.info("source list: " + sourceList);
+    LOG.info("first source: " + source);
 
     Configuration conf = getConf();
     conf.setInt(NODE_CNT_FIELD, n);
     conf.setInt("mapred.min.split.size", 1024 * 1024 * 1024);
+    conf.setInt(SOURCE, source);
+    conf.setInt(NUM_SOURCES, numSources);
+    conf.set(SOURCE_NODES, sources);
 
     Job job = Job.getInstance(conf);
     job.setJobName(BuildPersonalizedPageRankRecords.class.getSimpleName() + ":" + inputPath);
